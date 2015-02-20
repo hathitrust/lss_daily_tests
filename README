@@ -1,0 +1,4 @@
+These files based on old runtestsSlurm.pl and variations in /htapps/tburtonw.babel/pilsner/test/
+
+Original commit is just the unchanged files with names changed to reflect tests running against production Solr as opposed to particular hosts
+
