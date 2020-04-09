@@ -1,0 +1,431 @@
+head	1.2;
+access;
+symbols;
+locks
+	tburtonw:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2019.02.14.22.17.22;	author tburtonw;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2019.02.14.17.50.53;	author tburtonw;	state Exp;
+branches;
+next	;
+
+
+desc
+@initial commit
+@
+
+
+1.2
+log
+@revised to use solr_tester.pl and Solr 6 with core-3x etc
+@
+text
+@#!/usr/bin/perl -w
+#$Id: run_daily_tests.pl,v 1.1 2019/02/14 17:50:53 tburtonw Exp tburtonw $#
+#
+# Stripped down framework that sets up directories and runs
+# daily tests using solr_tester.pl
+#
+# See /htapps/tburtonw.babel/analysis/bin2/runtestsProdSolr.pl
+#  for ancestor of this program that did lots more:
+#  stop/start solr?
+#  warm cache
+#  run warmup queries
+#  run ls or solr queries  
+#
+
+
+use strict;
+use Time::HiRes;
+use Getopt::Long qw(:config auto_version auto_help);
+use Pod::Usage;
+
+
+BEGIN
+{
+    require '/htapps/tburtonw.babel/analysis/bin2/run_daily_tests.cfg';
+}
+
+my $Cfg={};
+no strict;
+$Cfg=$Config;
+use strict;
+
+my $DEBUG;#  = "true";  # set to undef to turn off
+my $TESTING ; # ="true";
+
+my $LOGDIR;
+my $QUERY_FILE;
+
+if (!defined ($QUERY_FILE))
+{
+    $QUERY_FILE = $Cfg->{'query_file'};
+}
+
+
+if (!defined ($LOGDIR))
+{
+    $LOGDIR = $Cfg->{'log_base_dir'};
+    $LOGDIR .='/testing' if $TESTING; 
+}
+
+my $BINDIR =$Cfg->{'bindir'};
+
+
+
+
+my $rv;
+
+
+BEGIN
+{
+    # pod2usage settings
+    my $help = 0;
+    my $man = 0;
+
+    $rv=GetOptions(    'h|help|?'              =>\$help, 
+                       'man'                   =>\$man,
+		       'd|dir|logdir:s'    =>\$LOGDIR,
+		       'q|query_file:s'        =>\$QUERY_FILE,
+                  );
+    #print usage if return value is false (i.e. problem processing options)
+    if (!($rv))
+    {
+        pod2usage(1)
+    }
+    pod2usage(1) if $help;
+    pod2usage (-exitstatus=>0, -verbose =>2) if $man;
+}
+
+
+#======================================================================
+#MAIN
+#
+# run tests 
+#----------------------------------------------------------------------
+
+# Make log directory 
+my $cmd = "mkdir -p $LOGDIR";
+doCommand($cmd);
+doTests();
+
+#----------------------------------------------------------------------
+sub doCommand
+{
+    my $cmd = shift;
+    print " would do command $cmd\n" if $DEBUG;
+    return if $DEBUG;
+    
+    my $status = system ($cmd);
+    if ($status == 0)
+    {
+        # success
+        print "command $cmd \n\tstatus was 0\n";
+    }
+    else
+    {
+        # failure
+        die "command $cmd failed with error status $status $!";
+    }
+}
+
+#----------------------------------------------------------------------
+sub doTests
+{
+
+    # run tests
+    #XXX why are we doing this again?    
+    $cmd = "mkdir -p $LOGDIR";
+    doCommand($cmd);
+    
+    my $start_run =  Time::HiRes::time;
+    runTests($LOGDIR,$BINDIR,$QUERY_FILE);
+    my $elapsed =  Time::HiRes::time - $start_run;
+    print STDERR "finshed testing   in $elapsed milliseconds\n";
+    
+}
+#----------------------------------------------------------------------
+sub runTests
+{
+    # rewrite to use solr_tester.pl
+    # and day 95 logs
+    my ($LOGDIR,$BINDIR,$QUERY_FILE) = @@_;
+        
+    my $cmd;        
+    # XXX could add params to solr_tester to use sleep or not?
+    # currently logdir is the date and log.tsv the log name.
+    # using the logdir allows us to do multiple runs/tests per day
+    $cmd = "perl $BINDIR" . '/solr_tester.pl '. $QUERY_FILE . ' >> ' . $LOGDIR . '/log.tsv';
+    doCommand($cmd);
+}
+#----------------------------------------------------------------------
+__END__
+
+
+=head1 SYNOPSIS
+
+
+FIX THIS !!! runtestsSlurm.pl [options]
+
+
+   runtestsSlurm.pl -d /full/path/to/logdir  -l myLogFileName
+
+
+=head1 Options:
+
+=over 8
+
+
+
+=item B<-d,--dir,--logdir> F<directory path>
+
+Full path to the directory for log files
+
+=item B<-l,--logfile> F<string>
+
+Name of logfile.  Default is urlfilename.log. This will be appended to the log directory path
+
+
+=item B<-h,--help>
+
+Prints this help
+
+
+=item B<--version>
+
+Prints version and exits.
+
+=back
+
+=head1 DESCRIPTION
+
+B<This program runs file of URLs containing Solr queries and logs the response>
+
+=head1 ENVIRONMENT
+
+
+
+=cut
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d2 14
+a15 1
+#$Id$#
+a16 4
+use LWP::UserAgent;
+#use LWP::Debug qw(+);  # uncomment to generate debugging info 
+use LWP::Authen::Basic;
+#use WWW::Mechanize;
+d24 1
+a24 2
+    require '/htapps/tburtonw.babel/analysis/bin2/runtestsProdSolr.cfg';
+    
+d32 1
+a32 1
+my $DEBUG; #  = "true";  # set to undef to turn off
+d35 2
+a36 2
+#my $TEST_TYPE= 'perl|ls_perl'
+my $TEST_TYPE = 'perl';
+d38 4
+a41 2
+
+my $LOGDIR;
+a51 2
+my $URLDIR = $Cfg->{'url_base_dir'}; 
+my $WARMUP_URLS = $URLDIR . '/warmup10thou';
+a52 1
+my $CACHE_WARMUP_URLS="";
+a53 4
+#my $CACHE_WARMUP_URLS ='/l1/bin/l/ls/test/data/urlfiles/newWarmup1600';
+# run queries in order of least I/O intensive queries first so that if evictions occur they will be evicted
+# skip this because each slurm now does own cache warming?
+#my $CACHE_WARMUP_URLS ='/l1/bin/l/ls/test/data/urlfiles/newWarmup1600.slowest.last';
+a54 1
+my $url;
+d56 1
+a56 1
+my $ua = getUA($Cfg);
+d67 1
+a87 1
+
+a113 2
+    my $LS;
+
+d115 1
+a115 1
+    
+d118 1
+a118 5
+    # this is to warm the OS cache using targeted queries 
+    # we still do the regular warm-ups so we can compare the effect of doing the cache warming with not doing it.  The regular warm-up will probably evice some stuff from the cache.
+# don't do this because slurm4/duff4 now doing it    
+#warmCache($LOGDIR,$BINDIR,$CACHE_WARMUP_URLS);
+    ##
+d120 1
+a120 11
+    doWarmups($LOGDIR,$BINDIR,$WARMUP_URLS);
+    if ($TEST_TYPE eq 'perl')
+    {
+        runTests($LOGDIR,$BINDIR,$URLDIR,$LS);
+    }
+    elsif ($TEST_TYPE eq 'ls_perl')
+    {
+        $LS="true";
+        runTests($LOGDIR,$BINDIR,$URLDIR,$LS);
+    }
+    
+a122 1
+
+d128 3
+a130 8
+    my ($LOGDIR,$BINDIR,$URLDIR,$LS) = @@_;
+    my @@queryfiles=qw (  all.processed.5000);
+    my $urlfile;
+    
+    
+    foreach my $filename (@@queryfiles)
+    {
+        my $cmd;        
+d132 6
+a137 59
+        my $subdir="";
+        if (defined($LS))
+        {
+            $subdir='/LSqueries';
+        }
+
+        $urlfile = $URLDIR .$subdir . '/' . $filename;
+
+        my $flags = " -t 600 -u $urlfile --logdir $LOGDIR -interval 100 -numq 10000";
+        if (defined($LS))
+        {
+            $flags = " --lsqueries" . $flags;
+        }
+
+        $cmd = $BINDIR . '/runqueries.pl'. $flags;
+
+        $cmd = $BINDIR . '/runqueries.pl'. " -t 600 -u $urlfile --logdir $LOGDIR -interval 2 -numq 4" if $TESTING;
+        doCommand($cmd);
+    }
+}
+#----------------------------------------------------------------------
+
+#----------------------------------------------------------------------
+sub doWarmups
+{
+    my ($LOGDIR,$BINDIR,$WARMUP_URLS) = @@_;
+    $cmd = $BINDIR . '/runqueries.pl'. " -t 20  -u $WARMUP_URLS  --logdir $LOGDIR -interval 100 -numq 10000" ;
+    $cmd = $BINDIR . '/runqueries.pl'. " -t 20  -u $WARMUP_URLS  --logdir $LOGDIR -interval 5 -numq 10" if $TESTING;
+    doCommand($cmd);    
+}
+
+#----------------------------------------------------------------------
+#----------------------------------------------------------------------
+sub    warmCache
+{
+    my ($LOGDIR,$BINDIR,$CACHE_WARMUP_URLS) = @@_;
+    $cmd = $BINDIR . '/runqueries.pl'. " -t 120  -u $CACHE_WARMUP_URLS  --logdir $LOGDIR -interval 100 -numq 10000" ;
+    doCommand($cmd);    
+}
+
+
+#======================================================================
+# LWP/Mech routines for stopping/starting Solr and checking status
+#------------------------------------------------------------------------------
+sub checkReturn
+{
+	my ($rv,$successMsg,$failureMsg)= @@_;
+	if (! defined ($rv))
+	{	
+		handleError("$failureMsg");           
+	}
+        elsif($rv =~m/FAIL/)
+        {
+            handleError("$failureMsg");           
+        }
+        else	
+	{
+            print "$successMsg\n";
+	}
+a139 63
+sub handleError
+{
+	#XXX replace this with something better perhaps die with message?
+	my $msg = shift;
+	print "$msg\n";
+        die "$msg";
+        
+}
+#----------------------------------------------------------------------
+sub doConnect
+{
+    my ($ua,$url) = @@_;
+    my $content;
+    my $msg;
+    
+    my   $req = HTTP::Request->new(GET => "$url");
+   #Replace below with standard error/content handling
+    my  $res = $ua->request($req);
+
+    # check the outcome
+    if ($res->is_success) {
+        $content= $res->content;
+    }
+    else {
+        $msg = "Error: " . $res->status_line . "\n";
+        handleError($msg)
+    }
+    return $content;
+}
+#----------------------------------------------------------------------
+sub getContentOrError
+{
+    my ($ua,$url) = @@_;
+    my $toReturn;
+    my $msg;
+   
+    my   $req = HTTP::Request->new(GET => "$url");
+    my   $res = $ua->request($req);
+    # check the outcome
+    if ($res->is_success) {
+        $toReturn= $res->content;
+    }
+    else {
+        $toReturn = "Error: " . $res->status_line . "\n";
+    }
+    return $toReturn;
+}
+#----------------------------------------------------------------------
+#======================================================================
+#  Config routines
+#----------------------------------------------------------------------
+
+#----------------------------------------------------------------------
+sub getUA
+{
+    my  $ua = LWP::UserAgent->new;
+    return $ua;
+    
+}
+
+
+
+#----------------------------------------------------------------------
+d146 1
+a146 1
+runtestsSlurm.pl [options]
+@

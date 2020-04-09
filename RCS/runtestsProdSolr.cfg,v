@@ -1,0 +1,43 @@
+head	1.1;
+access;
+symbols;
+locks
+	tburtonw:1.1; strict;
+comment	@# @;
+
+
+1.1
+date	2015.03.10.19.50.21;	author tburtonw;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#
+#$Id$
+
+$Config={};
+
+# These variables setup the directories for getting queries, running the program and logging
+
+my $BINDIR = '/htapps/tburtonw.babel/analysis/bin2';
+# dir for  urls is still pilsner/test
+#This dir has shard urls hard coded in the urls for shards 1-12!
+my $URL_BASE_DIR = '/htapps/tburtonw.babel/pilsner/test/data/urlfiles/Mirlyn/Slurm/Isilon';
+# old log location is /htapps/tburtonw.babel/pilsner/test/logs/SlurmTests/Isilon/prod
+my $LOG_BASE_DIR = '/htsolr/lss-dev/data/4/daily_test_logs/logs/Solr4';
+
+
+$Config->{'bindir'} = $BINDIR;
+$Config->{'url_base_dir'} = $URL_BASE_DIR;
+$Config->{'log_base_dir'} = $LOG_BASE_DIR;
+
+@
