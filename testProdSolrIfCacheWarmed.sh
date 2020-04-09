@@ -1,9 +1,9 @@
 #!/bin/sh
-#$Id: testProdSolrIfCacheWarmed.sh,v 1.3 2019/02/14 22:16:57 tburtonw Exp tburtonw $
+#$Id: testProdSolrIfCacheWarmed.sh,v 1.4 2019/02/19 17:33:53 tburtonw Exp tburtonw $
 
 # IP of hathitrust via the MACC load balancer.  Hostname might not get the MACC due to load balancing.
 
-URLROOT='http://141.213.128.184/flags/web/lss-warming-'
+URLROOT='https://babel.hathitrust.org/flags/web/lss-warming-'
 # filename is:  lss-warming-YYYY-MM-DD
 DATE=`date +%F` 
 URL=${URLROOT}${DATE}
@@ -11,7 +11,8 @@ URL=${URLROOT}${DATE}
 echo "url is $URL"
 COUNT=0
 
-until `wget -q -U SOLR  $URL -O - >/dev/null`
+until `curl -A solr_tester -s --fail $URL --resolve "babel.hathitrust.org:443:141.213.128.184" >/dev/null`
+      
 do sleep 300  
   echo "trying to get cache warming flag"
 # need limit here.  It tries every 5 minutes so 12 tries/hour

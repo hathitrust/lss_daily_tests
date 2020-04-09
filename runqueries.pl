@@ -1,5 +1,5 @@
 #! /usr/bin/perl -w
-#$Id: runqueries.pl,v 1.1 2015/03/10 19:49:48 tburtonw Exp tburtonw $ 
+#$Id: runqueries.pl,v 1.2 2016/08/08 21:47:25 tburtonw Exp tburtonw $ 
 
 use LWP;
 use LWP::UserAgent;
@@ -9,7 +9,7 @@ use File::Basename;
 use Time::HiRes;
 use CGI;
 
-$main::VERSION='$Id: runqueries.pl,v 1.1 2015/03/10 19:49:48 tburtonw Exp tburtonw $';
+$main::VERSION='$Id: runqueries.pl,v 1.2 2016/08/08 21:47:25 tburtonw Exp tburtonw $';
 
 my $URLFILE ='';
 my $LOG_DIR;
@@ -17,7 +17,7 @@ my $LOGFILE= '';
 my $TIMEOUT = 60;
 my $NUMQ =100;
 my $INTERVAL=100;  #100; #write to log every INTERVAL urls
-my $LS_QUERIES ='';  # process solr query responses by default. Set this to true to process response from ls app
+my $LS_QUERIES = ''; #"true" ; #'';  # process solr query responses by default. Set this to true to process response from ls app
 my $HTTP_METHOD = "get";
 
 
@@ -26,7 +26,7 @@ my $help = 0;
 my $man = 0;
 #
 
-my @report_fields=('qtime','hits','query','count','etime','error');# this is for order of report fields
+my @report_fields=('qtime','A_qtime','B_qtime','hits','query','count','etime','error');# this is for order of report fields
 
 
 
@@ -287,33 +287,51 @@ sub parse_response_ls
 {
     my $res = shift;
     my $hash_ref = shift;
+    my $A_qtime=0;
+    my $B_qtime=0;
+    my $Qtime=0;
+    my $numFound;
     
     # Check the outcome of the response
     if ($res->is_success) {
         my $content= $res->content;
         #<span>Search Results: </span>662 items found for <span>Minoritenkonvent</span> in 0.006 sec.</div><div class="refine"><span xmlns=""><ul cl
+# new <div class="SearchResults_status"><span>Search Results: </span>9 items found for <span>"rebecca goldman"</span> in <em>Full-Text + All Fields</em><span class="debug">
+#        (in 0.036 sec.)</span></div>
 
-        if ($content =~m,(\d+)\s+items\sfound.+in\s(\d+\.\d+)\ssec,)
+
+        if ($content =~m,(\d+[\,\d+]*)\s+items\sfound,)
         {
             $numFound=$1;
-            $Qtime=$2;
-            $Qtime =($Qtime * 1000);  #ls reports in seconds not milliseconds
-            $hash_ref->{hits}=$numFound;
-            $hash_ref->{qtime}=$Qtime;
-        }
-        # if 0 items are found UI does not insert a 0
-        elsif ($content =~m,items\sfound.+in\s(\d+\.\d+)\ssec,)
-        {
-            $numFound=0;
-            $Qtime=$1;
-            $Qtime =($Qtime * 1000);  #ls reports in seconds not milliseconds
-            $hash_ref->{hits}=$numFound;
-            $hash_ref->{qtime}=$Qtime;
-        }
+	}
+	else
+	{
+	    $numFound=0;
+	}
+	#"B_qtime":"0.269"
+	#"A_qtime":"0.270"
+	
+	if ($content =~/A_qtime\"\:\"([^\"]+)\"/)
+	{
+	    $A_qtime=$1;
+	}
+	if ($content =~/B_qtime\"\:\"([^\"]+)\"/)
+	{
+	    $B_qtime=$1;
+	}
+	
+	if ($content =~m,in\s(\d+\.\d+)\ssec,)
+	{    
+	    $Qtime=$1;
+	}
 
-        
-
-        print STDOUT "Found=$numFound\tTime= $Qtime\n";
+	$Qtime =($Qtime * 1000);  #ls reports in seconds not milliseconds
+	$hash_ref->{hits}=$numFound;
+	$hash_ref->{qtime}=$Qtime;
+	$hash_ref->{'A_qtime'}="$A_qtime";
+	$hash_ref->{'B_qtime'}="$B_qtime";
+	
+	print STDOUT "Found=$numFound\tTime= $Qtime\n";
         $hash_ref->{error}='';# must have defined field
     }
     else {
